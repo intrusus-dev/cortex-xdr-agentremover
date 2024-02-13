@@ -1,6 +1,6 @@
 # Cortex XDR Agent Cleaner Automation Scripts
 
-![Cortex XDR Logo](https://example.com/path/to/cortex-logo.png)
+![Cortex XDR Logo](https://media.licdn.com/dms/image/D5612AQE3_mg6EduwdQ/article-cover_image-shrink_600_2000/0/1661990539721?e=2147483647&v=beta&t=L8kvj_IDOC1MmGQ3BpbMQYkuT-GxaCxPjowWLCHIlgQ)
 
 This repository contains automation scripts for the Palo Alto Networks Cortex XDR Agent Cleaner tool. The scripts are designed to automate the process of uninstalling the Cortex XDR agent from endpoints where the agent cannot be upgraded or uninstalled through the usual methods due to installation issues. These scripts provide a solution for IT administrators and cybersecurity professionals to efficiently address common issues with Cortex XDR agent installations.
 
