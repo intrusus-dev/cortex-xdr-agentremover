@@ -1,4 +1,4 @@
-# Cortex XDR Agent Cleaner Automation Scripts
+# Cortex XDR Agent Cleaner Automation Script
 
 ![Cortex XDR Logo](https://media.licdn.com/dms/image/D5612AQE3_mg6EduwdQ/article-cover_image-shrink_600_2000/0/1661990539721?e=2147483647&v=beta&t=L8kvj_IDOC1MmGQ3BpbMQYkuT-GxaCxPjowWLCHIlgQ)
 
