@@ -13,6 +13,56 @@ param(
 $xdrPath = "C:\Program Files\Palo Alto Networks\Traps"
 $logPath = "C:\Temp\Cortex\uninstall.log"
 $cleanerLogPath = "C:\Temp\Cortex\xdrcleaner.log"
+$taskName = "RunXDRCleanerPostReboot"
+$taskAction = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -msiPath `"$msiPath`" -cleanerPath `"$cleanerPath`" -uninstallPw `"$uninstallPw`" -reboot"
+
+# Function to run XDR Agent Cleaner
+function RunXdrAgentCleaner {
+    Write-Output "Running XDR Agent Cleaner..."
+    $cleanerArguments = "--silent --password $uninstallPw --log $cleanerLogPath"
+    $cleanerCommand = "`"$cleanerPath`" $cleanerArguments"
+
+    # Using Start-Process to invoke the cleaner
+    try {
+        $cleanerResult = Start-Process -FilePath "cmd.exe" -ArgumentList "/c $cleanerCommand" -NoNewWindow -Wait -PassThru
+        if ($cleanerResult.ExitCode -eq 0) {
+            Write-Output "Cleaner executed successfully."
+        } else {
+            Write-Output "Cleaner failed with Exit Code: $($cleanerResult.ExitCode)."
+            exit 1
+        }
+    } catch {
+        Write-Error "An error occurred while running the cleaner: $_"
+        exit 1
+    }
+}
+
+# Function to check for and remove the scheduled task if present
+function CheckAndRemoveScheduledTask {
+    $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($task) {
+        Write-Output "Found scheduled task $taskName. Running cleaner and removing task..."
+        # Run Cleaner one more time
+        Write-Output "Running XDR Agent Cleaner..."
+        $cleanerArguments = "--silent --password $uninstallPw --log $cleanerLogPath"
+        $cleanerCommand = "`"$cleanerPath`" $cleanerArguments"
+        # Using Start-Process to invoke the cleaner
+        try {
+            $cleanerResult = Start-Process -FilePath "cmd.exe" -ArgumentList "/c $cleanerCommand" -NoNewWindow -Wait -PassThru
+            if ($cleanerResult.ExitCode -eq 0) {
+                Write-Output "Cleaner executed successfully."
+            } else {
+                Write-Output "Cleaner failed with Exit Code: $($cleanerResult.ExitCode)."
+                exit 1
+            }
+        } catch {
+            Write-Error "An error occurred while running the cleaner: $_"
+            exit 1
+        }
+    }
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+        exit 0
+}
 
 # Ensure administrative privileges
 function CheckAdminRights {
@@ -33,7 +83,6 @@ function Ensure-DirectoriesExist {
 
 # Disable tamper protection
 function DisableTamperProtection {
-    $securePassword = ConvertTo-SecureString $uninstallPw -AsPlainText -Force
     $cytoolPath = "$xdrPath\cytool.exe"
     Write-Output "Disabling tamper protection..."
     $processInfo = New-Object System.Diagnostics.ProcessStartInfo
@@ -49,28 +98,19 @@ function DisableTamperProtection {
     $process.WaitForExit()
     if ($process.ExitCode -ne 0) {
         Write-Error "Failed to disable tamper protection. Exit Code: $($process.ExitCode)"
-       # exit
+        # exit
     }
 }
 
-# Function to clean up using XDR Agent Cleaner
-function UseXdrAgentCleaner {
-    Write-Output "Using XDR Agent Cleaner as a fallback..."
-    $quotedCleanerPath = "`"$cleanerPath`""  # Ensure the path is quoted
-    $cleanerArguments = "--silent --password $uninstallPw --log $cleanerLogPath"
-    $cleanerCommand = "$quotedCleanerPath $cleanerArguments"
+# Function to schedule the XDR Agent Cleaner to run after reboot
+function ScheduleCleanerTask {
+    Write-Output "Scheduling XDR Agent Cleaner to run when the user logs on..."
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -msiPath `"$msiPath`" -cleanerPath `"$cleanerPath`" -uninstallPw `"$uninstallPw`""
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
-    # Using Start-Process to invoke the cleaner
-    try {
-        $cleanerResult = Start-Process -FilePath "cmd.exe" -ArgumentList "/c $cleanerCommand" -NoNewWindow -Wait -PassThru
-        if ($cleanerResult.ExitCode -eq 0) {
-            Write-Output "Cleaner executed successfully."
-        } else {
-            Write-Output "Cleaner failed with Exit Code: $($cleanerResult.ExitCode)."
-        }
-    } catch {
-        Write-Error "An error occurred while running the cleaner: $_"
-    }
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings
 }
 
 # Uninstall MSI
@@ -82,12 +122,16 @@ function UninstallMSI {
         Write-Output "Silent uninstallation via MSI successful."
     } else {
         Write-Output "Silent MSI uninstall failed with Exit Code: $($msiResult.ExitCode)."
-        UseXdrAgentCleaner
+        RunXdrAgentCleaner
+        ScheduleCleanerTask
+        Write-Output "Rebooting the system..."
+        Restart-Computer -Force
     }
 }
 
 # Main execution
 CheckAdminRights
 Ensure-DirectoriesExist
+CheckAndRemoveScheduledTask
 DisableTamperProtection
 UninstallMSI
