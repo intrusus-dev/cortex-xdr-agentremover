@@ -93,12 +93,12 @@ function DisableTamperProtection {
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $processInfo
     $process.Start() | Out-Null
-    $process.StandardInput.WriteLine("test")
+    $process.StandardInput.WriteLine($uninstallPw)
     $process.StandardInput.Close()
     $process.WaitForExit()
     if ($process.ExitCode -ne 0) {
         Write-Error "Failed to disable tamper protection. Exit Code: $($process.ExitCode)"
-        # exit
+        exit
     }
 }
 
